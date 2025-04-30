@@ -426,16 +426,16 @@
       // Left score (You)
       ctx.textAlign = 'left';
       ctx.font = '32px monospace'; // Bigger font for score
-      ctx.fillText(leftScore, 20, 35);
+      ctx.fillText(leftScore, 40, 50);
       ctx.font = '14px monospace'; // Smaller font for name
-      ctx.fillText('You', 20, 55);
+      ctx.fillText('You', 40, 70);
 
       // Right score (Satoshi)
       ctx.textAlign = 'right';
       ctx.font = '32px monospace'; // Bigger font for score
-      ctx.fillText(rightScore, canvas.width - 20, 35);
+      ctx.fillText(rightScore, canvas.width - 40, 50);
       ctx.font = '14px monospace'; // Smaller font for name
-      ctx.fillText('Satoshi', canvas.width - 20, 55);
+      ctx.fillText('Satoshi', canvas.width - 40, 70);
       
       ctx.textAlign = 'left'; // Reset alignment
 
