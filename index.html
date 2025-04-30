@@ -192,13 +192,17 @@
     let touchStartY = 0;
     let touchMoveY = 0;
     let isTouching = false;
-    let rightPaddleSpeed = 0; // Track paddle's vertical speed
+    let leftPaddleSpeed = 0;
+    let paddleMomentum = 0;
+    const momentumDecay = 0.95; // How quickly momentum decays
+    const maxMomentum = 15; // Maximum momentum speed
 
     canvas.addEventListener('touchstart', (e) => {
       if (!gameStarted) return;
       e.preventDefault();
       isTouching = true;
       touchStartY = e.touches[0].clientY;
+      paddleMomentum = 0; // Reset momentum on new touch
     });
 
     canvas.addEventListener('touchmove', (e) => {
@@ -207,9 +211,11 @@
       if (isTouching) {
         touchMoveY = e.touches[0].clientY;
         const deltaY = touchMoveY - touchStartY;
-        const oldY = rightPaddle.y;
-        rightPaddle.y += deltaY;
-        rightPaddleSpeed = (rightPaddle.y - oldY) * 0.5; // Calculate paddle speed
+        const oldY = leftPaddle.y;
+        leftPaddle.y += deltaY;
+        leftPaddleSpeed = (leftPaddle.y - oldY) * 0.5;
+        // Store the last movement speed for momentum
+        paddleMomentum = Math.min(Math.max(deltaY * 0.8, -maxMomentum), maxMomentum);
         touchStartY = touchMoveY;
       }
     });
@@ -218,7 +224,8 @@
       if (!gameStarted) return;
       e.preventDefault();
       isTouching = false;
-      rightPaddleSpeed = 0; // Reset paddle speed
+      leftPaddleSpeed = 0;
+      // Momentum is already set from the last movement
     });
 
     // Keyboard controls
@@ -229,14 +236,21 @@
 
     document.addEventListener('keydown', (e) => {
       if (!gameStarted) return;
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        paddleMomentum = 0; // Reset momentum when key is pressed
+      }
       keys[e.key] = true;
     });
+
     document.addEventListener('keyup', (e) => {
       if (!gameStarted) return;
       keys[e.key] = false;
-      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        rightPaddleSpeed = 0; // Reset paddle speed when key is released
+      if (e.key === 'ArrowUp') {
+        paddleMomentum = -maxMomentum * 0.5; // Add upward momentum on release
+      } else if (e.key === 'ArrowDown') {
+        paddleMomentum = maxMomentum * 0.5; // Add downward momentum on release
       }
+      leftPaddleSpeed = 0;
     });
 
     // Game loop
@@ -265,31 +279,52 @@
       ctx.fillStyle = '#fff';
 
       // Move paddles
-      // Left paddle moves automatically with increased error
-      let targetY = ball.y - leftPaddle.height / 2;
+      // Right paddle (AI) moves automatically with increased error
+      let targetY = ball.y - rightPaddle.height / 2;
       // Adjust error based on Bitcoin difficulty
-      let errorRange = 80 - (normalizedDifficulty * 0.6); // Error range from 80 to 20
+      let errorRange = 80 - (normalizedDifficulty * 0.6);
       let error = Math.random() * errorRange - (errorRange / 2);
-      // Add random delay to AI reaction based on difficulty
-      if (Math.random() < (0.3 - (normalizedDifficulty * 0.002))) { // Delay chance from 30% to 10%
-        targetY = leftPaddle.y; // Stay in current position
+      if (Math.random() < (0.3 - (normalizedDifficulty * 0.002))) {
+        targetY = rightPaddle.y;
       }
       targetY += error;
-      let moveSpeed = (targetY - leftPaddle.y) * (0.05 + (normalizedDifficulty * 0.0005)); // Speed from 0.05 to 0.1
-      leftPaddle.y += moveSpeed;
+      let moveSpeed = (targetY - rightPaddle.y) * (0.05 + (normalizedDifficulty * 0.0005));
+      rightPaddle.y += moveSpeed;
       
-      // Right paddle controlled by touch or keyboard
-      const oldY = rightPaddle.y;
-      if (keys['ArrowUp']) rightPaddle.y -= rightPaddle.speed;
-      if (keys['ArrowDown']) rightPaddle.y += rightPaddle.speed;
-      // Calculate paddle speed for keyboard controls
-      if (keys['ArrowUp'] || keys['ArrowDown']) {
-        rightPaddleSpeed = (rightPaddle.y - oldY) * 0.5;
+      // Left paddle controlled by touch/keyboard + momentum
+      const oldY = leftPaddle.y;
+      if (keys['ArrowUp']) {
+        leftPaddle.y -= leftPaddle.speed;
+        paddleMomentum = 0; // Reset momentum during key press
+      }
+      if (keys['ArrowDown']) {
+        leftPaddle.y += leftPaddle.speed;
+        paddleMomentum = 0; // Reset momentum during key press
+      }
+      
+      // Apply momentum if not touching and not pressing keys
+      if (!isTouching && !keys['ArrowUp'] && !keys['ArrowDown'] && paddleMomentum !== 0) {
+        leftPaddle.y += paddleMomentum;
+        paddleMomentum *= momentumDecay; // Decay the momentum
+        // Stop very small momentum to prevent endless tiny movements
+        if (Math.abs(paddleMomentum) < 0.1) paddleMomentum = 0;
       }
 
-      // Keep paddles inside canvas
-      rightPaddle.y = Math.max(0, Math.min(canvas.height - rightPaddle.height, rightPaddle.y));
-      leftPaddle.y = Math.max(0, Math.min(canvas.height - leftPaddle.height, leftPaddle.y));
+      // Calculate paddle speed for collision physics
+      if (keys['ArrowUp'] || keys['ArrowDown']) {
+        leftPaddleSpeed = (leftPaddle.y - oldY) * 0.5;
+      } else {
+        leftPaddleSpeed = paddleMomentum * 0.5;
+      }
+
+      // Keep paddles inside canvas and stop momentum if hitting edges
+      if (leftPaddle.y < 0) {
+        leftPaddle.y = 0;
+        paddleMomentum = 0;
+      } else if (leftPaddle.y > canvas.height - leftPaddle.height) {
+        leftPaddle.y = canvas.height - leftPaddle.height;
+        paddleMomentum = 0;
+      }
 
       // Apply friction to ball
       ball.speedX *= ball.friction;
@@ -328,7 +363,7 @@
         // Reverse direction and adjust vertical speed based on hit position
         ball.x = leftPaddle.x + leftPaddle.width + ball.radius; // Prevent ball from getting stuck
         ball.speedX = Math.abs(ball.speedX) * 1.05; // Smaller speed increase
-        ball.speedY = hitPosition * ball.maxSpeed + moveSpeed * 0.8; // Add AI paddle momentum
+        ball.speedY = hitPosition * ball.maxSpeed + leftPaddleSpeed * 0.8; // Add player paddle momentum
       } else if (
         ball.x + ball.radius > rightPaddle.x &&
         ball.x - ball.radius < rightPaddle.x + rightPaddle.width &&
@@ -340,7 +375,7 @@
         // Reverse direction and adjust vertical speed based on hit position
         ball.x = rightPaddle.x - ball.radius; // Prevent ball from getting stuck
         ball.speedX = -Math.abs(ball.speedX) * 1.05; // Smaller speed increase
-        ball.speedY = hitPosition * ball.maxSpeed + rightPaddleSpeed * 0.8; // Add player paddle momentum
+        ball.speedY = hitPosition * ball.maxSpeed + moveSpeed * 0.8; // Add AI paddle momentum
       }
 
       // Ball out of bounds - score and reset
@@ -376,11 +411,21 @@
       ctx.fillStyle = '#fff';
 
       // Draw scores
-      ctx.font = '14px monospace';
-      ctx.fillText(`Satoshi: ${leftScore}`, 20, 30);
-      ctx.textAlign = 'right';
-      ctx.fillText(`${rightScore}: You`, canvas.width - 20, 30);
+      // Left score (You)
       ctx.textAlign = 'left';
+      ctx.font = '32px monospace'; // Bigger font for score
+      ctx.fillText(leftScore, 20, 35);
+      ctx.font = '14px monospace'; // Smaller font for name
+      ctx.fillText('You', 20, 55);
+
+      // Right score (Satoshi)
+      ctx.textAlign = 'right';
+      ctx.font = '32px monospace'; // Bigger font for score
+      ctx.fillText(rightScore, canvas.width - 20, 35);
+      ctx.font = '14px monospace'; // Smaller font for name
+      ctx.fillText('Satoshi', canvas.width - 20, 55);
+      
+      ctx.textAlign = 'left'; // Reset alignment
 
       // Draw difficulty with Bitcoin symbol
       ctx.font = '10px monospace';
