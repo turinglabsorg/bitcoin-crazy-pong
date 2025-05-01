@@ -1,11 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import * as Tone from "tone";
 
 export default function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gameStarted, setGameStarted] = useState(false);
   const [showModal, setShowModal] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
+  const [currentRiff, setCurrentRiff] = useState<'metallica' | 'tool' | 'stranger' | 'none'>('none');
+  
+  // Synth references
+  const synthRef = useRef<Tone.Synth | null>(null);
+  const melodyRef = useRef<Tone.Sequence | null>(null);
 
   // Game state
   const gameState = useRef({
@@ -52,6 +59,177 @@ export default function Game() {
     }
   });
 
+  // Add state for audio ready
+  const [isAudioReady, setIsAudioReady] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  // Check if we're on the client side
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // Initialize Tone.js only on client side
+  useEffect(() => {
+    if (isClient) {
+      const setupAudio = async () => {
+        try {
+          if (Tone.context.state !== "running") {
+            await Tone.start();
+            await Tone.context.resume();
+          }
+          setIsAudioReady(true);
+        } catch (error) {
+          console.error("Failed to initialize audio:", error);
+        }
+      };
+      setupAudio();
+    }
+  }, [isClient]);
+
+  // Initialize audio
+  const initAudio = async () => {
+    try {
+      // Only proceed if we're on client side and audio is ready
+      if (!isClient || !isAudioReady) {
+        console.log("Audio not ready or not on client side");
+        return false;
+      }
+
+      console.log("Starting audio initialization...");
+      
+      // Create new synth if it doesn't exist or is disposed
+      if (!synthRef.current || synthRef.current.disposed) {
+        console.log("Creating new synth...");
+        synthRef.current = new Tone.Synth({
+          oscillator: { type: "square" },
+          envelope: {
+            attack: 0.01,
+            decay: 0.2,
+            sustain: 0.3,
+            release: 0.1
+          }
+        }).toDestination();
+        
+        // Set initial volume
+        synthRef.current.volume.value = isMuted ? -Infinity : -12;
+        console.log("Synth created with volume:", synthRef.current.volume.value);
+      }
+
+      // Stop any existing sequence
+      if (melodyRef.current) {
+        melodyRef.current.stop();
+        melodyRef.current.dispose();
+        melodyRef.current = null;
+      }
+
+      // Only create melody sequence if we want background music and not in 'none' mode
+      if (!melodyRef.current && gameStarted && currentRiff !== 'none') {
+        console.log("Creating melody sequence...");
+        
+        let melody: (string | null)[];
+        let noteLength: string;
+        let bpm: number;
+
+        if (currentRiff === 'metallica') {
+          // Master of Puppets main riff (simplified)
+          melody = [
+            "E4", "E4", "G4", "C5", "B4", "E4",  // First phrase
+            "D4", "C4", "B3", "E4",              // Second phrase
+            "E4", "G4", "C5", "B4", "G4", "E4",  // Repeat with variation
+            "D4", "C4", "B3", null               // End with rest
+          ];
+          noteLength = "16n";
+          bpm = 180;
+        } else {
+          // Tool's Schism main riff (simplified)
+          melody = [
+            "D3", "D3", "A3", "D3",              // First measure
+            "G3", "A3", "D3", null,              // Second measure
+            "D3", "D3", "A3", "C4",              // Third measure
+            "B3", "A3", "G3", "D3",              // Fourth measure
+            "D3", "E3", "F3", "G3",              // Build up
+            "A3", "G3", "F3", "E3",              // Descend
+            "D3", null, "A3", "D3",              // Tension
+            "G3", "A3", "B3", null               // Resolution
+          ];
+          noteLength = "8n";
+          bpm = 90; // Schism's tempo
+        }
+
+        // Adjust envelope based on the riff
+        if (synthRef.current) {
+          if (currentRiff === 'metallica') {
+            synthRef.current.envelope.attack = 0.01;
+            synthRef.current.envelope.decay = 0.2;
+            synthRef.current.envelope.sustain = 0.3;
+            synthRef.current.envelope.release = 0.1;
+          } else {
+            // More sustained sound for Tool
+            synthRef.current.envelope.attack = 0.02;
+            synthRef.current.envelope.decay = 0.3;
+            synthRef.current.envelope.sustain = 0.4;
+            synthRef.current.envelope.release = 0.3;
+          }
+        }
+
+        melodyRef.current = new Tone.Sequence(
+          (time, note) => {
+            if (!isMuted && synthRef.current && !synthRef.current.disposed && note) {
+              synthRef.current.triggerAttackRelease(note, noteLength, time);
+            }
+          },
+          melody,
+          noteLength
+        );
+
+        // Set tempo
+        Tone.Transport.bpm.value = bpm;
+
+        // Start transport and sequence if not muted
+        if (!isMuted) {
+          console.log(`Starting ${currentRiff} riff...`);
+          Tone.Transport.start();
+          melodyRef.current.start(0);
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Audio initialization error:', error);
+      return false;
+    }
+  };
+
+  // Toggle mute
+  const toggleMute = async () => {
+    try {
+      console.log("Toggling mute...");
+      const newMutedState = !isMuted;
+      setIsMuted(newMutedState);
+
+      if (!synthRef.current || !melodyRef.current) {
+        console.log("No audio to toggle - reinitializing...");
+        await initAudio();
+        return;
+      }
+
+      console.log("Setting synth volume:", newMutedState ? "muted" : "unmuted");
+      synthRef.current.volume.value = newMutedState ? -Infinity : -12;
+
+      if (newMutedState) {
+        console.log("Stopping melody");
+        melodyRef.current.stop();
+        Tone.Transport.stop();
+      } else {
+        console.log("Starting melody");
+        Tone.Transport.start();
+        melodyRef.current.start(0);
+      }
+    } catch (error) {
+      console.error('Toggle mute error:', error);
+    }
+  };
+
   // Fetch Bitcoin mempool data
   const fetchBitcoinMempool = async () => {
     try {
@@ -72,6 +250,222 @@ export default function Game() {
     } catch (error) {
       console.error('Error fetching mempool data:', error);
       gameState.current.normalizedDifficulty = Math.floor(Math.random() * 101);
+    }
+  };
+
+  // Add flash effect function
+  const flashScreen = () => {
+    const flash = document.getElementById('flash');
+    if (flash) {
+      flash.style.opacity = '1';
+      setTimeout(() => {
+        flash.style.opacity = '0';
+      }, 50);
+    }
+  };
+
+  // Play hit sound
+  const playHitSound = async () => {
+    try {
+      console.log("Playing hit sound...");
+      
+      // If no synth, try to initialize audio
+      if (!synthRef.current) {
+        console.log("No synth found, initializing audio...");
+        await initAudio();
+      }
+
+      // Double check we have a synth after potential initialization
+      if (!synthRef.current) {
+        console.log("Failed to initialize synth");
+        return;
+      }
+
+      if (!isMuted && synthRef.current && !synthRef.current.disposed) {
+        synthRef.current.triggerAttackRelease("G5", "16n");
+      }
+    } catch (error) {
+      console.error('Play hit sound error:', error);
+    }
+  };
+
+  // Play score sound
+  const playScoreSound = async () => {
+    try {
+      console.log("Playing score sound...");
+      
+      // If no synth, try to initialize audio
+      if (!synthRef.current) {
+        console.log("No synth found, initializing audio...");
+        await initAudio();
+      }
+
+      // Double check we have a synth after potential initialization
+      if (!synthRef.current) {
+        console.log("Failed to initialize synth");
+        return;
+      }
+
+      if (!isMuted && synthRef.current && !synthRef.current.disposed) {
+        const now = Tone.now();
+        synthRef.current.triggerAttackRelease("C5", "8n", now);
+        synthRef.current.triggerAttackRelease("E5", "8n", now + 0.1);
+        synthRef.current.triggerAttackRelease("G5", "8n", now + 0.2);
+      }
+    } catch (error) {
+      console.error('Play score sound error:', error);
+    }
+  };
+
+  // Add riff switch function
+  const switchRiff = async () => {
+    try {
+      // Calculate next riff
+      const nextRiff = currentRiff === 'none' ? 'metallica' : 
+                      currentRiff === 'metallica' ? 'tool' :
+                      currentRiff === 'tool' ? 'stranger' : 'none';
+      
+      console.log(`Switching riff from ${currentRiff} to ${nextRiff}`);
+      
+      // Stop current melody if it exists
+      if (melodyRef.current) {
+        console.log('Stopping current melody');
+        melodyRef.current.stop();
+        melodyRef.current.dispose();
+        melodyRef.current = null;
+        Tone.Transport.stop();
+      }
+
+      // Update state first
+      setCurrentRiff(nextRiff);
+
+      // For non-'none' states, initialize immediately
+      if (nextRiff !== 'none') {
+        // Ensure audio context is running
+        if (Tone.context.state !== "running") {
+          await Tone.start();
+          await Tone.context.resume();
+        }
+
+        // Create new synth if needed
+        if (!synthRef.current || synthRef.current.disposed) {
+          console.log("Creating new synth...");
+          synthRef.current = new Tone.Synth({
+            oscillator: { type: "square" },
+            envelope: {
+              attack: 0.01,
+              decay: 0.2,
+              sustain: 0.3,
+              release: 0.1
+            }
+          }).toDestination();
+          synthRef.current.volume.value = isMuted ? -Infinity : -12;
+        }
+
+        // Create and start new melody sequence
+        console.log("Creating melody sequence...");
+        let melody: (string | null)[] = [];
+        let noteLength: string = "8n";  // Default note length
+        let bpm: number = 120;          // Default tempo
+
+        if (nextRiff === 'metallica') {
+          melody = [
+            "E4", "E4", "G4", "C5", "B4", "E4",  // First phrase
+            "D4", "C4", "B3", "E4",              // Second phrase
+            "E4", "G4", "C5", "B4", "G4", "E4",  // Repeat with variation
+            "D4", "C4", "B3", null               // End with rest
+          ];
+          noteLength = "16n";
+          bpm = 180;
+          
+          // Metallica sound
+          if (synthRef.current) {
+            synthRef.current.envelope.attack = 0.01;
+            synthRef.current.envelope.decay = 0.2;
+            synthRef.current.envelope.sustain = 0.3;
+            synthRef.current.envelope.release = 0.1;
+            synthRef.current.oscillator.type = "square";
+          }
+        } else if (nextRiff === 'tool') {
+          melody = [
+            "D3", "D3", "A3", "D3",              // First measure
+            "G3", "A3", "D3", null,              // Second measure
+            "D3", "D3", "A3", "C4",              // Third measure
+            "B3", "A3", "G3", "D3",              // Fourth measure
+            "D3", "E3", "F3", "G3",              // Build up
+            "A3", "G3", "F3", "E3",              // Descend
+            "D3", null, "A3", "D3",              // Tension
+            "G3", "A3", "B3", null               // Resolution
+          ];
+          noteLength = "8n";
+          bpm = 90;
+          
+          // Tool sound
+          if (synthRef.current) {
+            synthRef.current.envelope.attack = 0.02;
+            synthRef.current.envelope.decay = 0.3;
+            synthRef.current.envelope.sustain = 0.4;
+            synthRef.current.envelope.release = 0.3;
+            synthRef.current.oscillator.type = "square";
+          }
+        } else if (nextRiff === 'stranger') {
+          melody = [
+            "C4", "E4", "G4", "B4",              // First arpeggio
+            "C5", "B4", "G4", "E4",              // Descending
+            "C4", "E4", "G4", "B4",              // Repeat
+            "C5", "B4", "G4", "E4",              // Descending
+            "C4", null, "E4", null,              // Sparse notes for tension
+            "G4", null, "B4", null,              // Building up
+            "C5", "B4", "G4", "E4",              // Final descent
+            "C4", null, null, null               // End on root
+          ];
+          noteLength = "8n";
+          bpm = 85; // Stranger Things tempo
+          
+          // Stranger Things sound
+          if (synthRef.current) {
+            synthRef.current.envelope.attack = 0.1;
+            synthRef.current.envelope.decay = 0.3;
+            synthRef.current.envelope.sustain = 0.7;
+            synthRef.current.envelope.release = 0.8;
+            synthRef.current.oscillator.type = "sawtooth"; // More analog synth sound
+          }
+        }
+
+        melodyRef.current = new Tone.Sequence(
+          (time, note) => {
+            if (!isMuted && synthRef.current && !synthRef.current.disposed && note) {
+              synthRef.current.triggerAttackRelease(note, noteLength, time);
+            }
+          },
+          melody!,
+          noteLength
+        );
+
+        // Set tempo and start
+        Tone.Transport.bpm.value = bpm;
+        if (!isMuted) {
+          console.log(`Starting ${nextRiff} riff...`);
+          Tone.Transport.start();
+          melodyRef.current.start(0);
+        }
+      }
+    } catch (error) {
+      console.error('Switch riff error:', error);
+    }
+  };
+
+  // Helper function to get riff icon and title
+  const getRiffDisplay = () => {
+    switch (currentRiff) {
+      case 'metallica':
+        return { icon: '🤘', title: 'Master of Puppets' };
+      case 'tool':
+        return { icon: '🌀', title: 'Schism' };
+      case 'stranger':
+        return { icon: '🔮', title: 'Stranger Things' };
+      case 'none':
+        return { icon: '🚫', title: 'No Music' };
     }
   };
 
@@ -294,6 +688,7 @@ export default function Game() {
         ball.x = leftPaddle.x + leftPaddle.width + ball.radius;
         ball.speedX = Math.abs(ball.speedX) * 1.05;
         ball.speedY = hitPosition * ball.maxSpeed + gameState.current.touchControls.leftPaddleSpeed * 0.8;
+        playHitSound();
       } else if (ball.x + ball.radius > rightPaddle.x &&
                  ball.x - ball.radius < rightPaddle.x + rightPaddle.width &&
                  ball.y > rightPaddle.y &&
@@ -302,15 +697,20 @@ export default function Game() {
         ball.x = rightPaddle.x - ball.radius;
         ball.speedX = -Math.abs(ball.speedX) * 1.05;
         ball.speedY = hitPosition * ball.maxSpeed + moveSpeed * 0.8;
+        playHitSound();
       }
 
       // Score points
       if (ball.x < 0) {
         gameState.current.rightScore++;
+        flashScreen();
         resetBall();
+        playScoreSound();
       } else if (ball.x > canvas.width) {
         gameState.current.leftScore++;
+        flashScreen();
         resetBall();
+        playScoreSound();
       }
 
       // Draw paddles
@@ -344,11 +744,32 @@ export default function Game() {
       ctx.font = '14px monospace';
       ctx.fillText('Satoshi', canvas.width - 40, 70);
       
-      ctx.textAlign = 'left';
-      ctx.font = '10px monospace';
+      // Draw mempool info in center, aligned with bottom buttons
       ctx.textAlign = 'center';
-      ctx.fillText(`₿ mempool: ${gameState.current.bitcoinDifficulty} tx`, canvas.width / 2, canvas.height - 10);
-      ctx.textAlign = 'left';
+      ctx.font = '12px monospace';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      const mempoolText = `₿ mempool: ${gameState.current.bitcoinDifficulty} tx`;
+      const textMetrics = ctx.measureText(mempoolText);
+      const textHeight = 16;
+      const padding = 6;
+      const bottomMargin = 48;
+      
+      // Draw semi-transparent background for better readability
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillRect(
+        (canvas.width - textMetrics.width) / 2 - padding,
+        canvas.height - bottomMargin - textHeight - padding,
+        textMetrics.width + padding * 2,
+        textHeight + padding * 2
+      );
+      
+      // Draw text
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.fillText(
+        mempoolText,
+        canvas.width / 2,
+        canvas.height - bottomMargin - padding
+      );
 
       requestAnimationFrame(gameLoop);
     };
@@ -365,46 +786,182 @@ export default function Game() {
       gameLoop();
     }
 
+    // Cleanup function
     return () => {
-      clearInterval(interval);
+      // Clean up event listeners
       canvas.removeEventListener('touchstart', handleTouchStart);
       canvas.removeEventListener('touchmove', handleTouchMove);
       canvas.removeEventListener('touchend', handleTouchEnd);
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('resize', resizeCanvas);
-    };
-  }, [gameStarted]);
+      clearInterval(interval);
 
-  const startGame = () => {
-    setShowModal(false);
-    setGameStarted(true);
+      // Only dispose audio if the game is actually stopping
+      if (!gameStarted) {
+        if (melodyRef.current) {
+          melodyRef.current.stop();
+          Tone.Transport.stop();
+          melodyRef.current.dispose();
+          melodyRef.current = null;
+        }
+        if (synthRef.current) {
+          synthRef.current.dispose();
+          synthRef.current = null;
+        }
+        Tone.Transport.stop();
+      }
+    };
+  }, [gameStarted, isMuted]);
+
+  // Start game function
+  const startGame = async () => {
+    try {
+      console.log("Starting game...");
+      
+      // Ensure audio context is ready
+      if (Tone.context.state !== "running") {
+        console.log("Requesting initial audio permission...");
+        await Tone.context.resume();
+        await Tone.start();
+      }
+      
+      // Only initialize audio if not in 'none' state
+      if (currentRiff !== 'none') {
+        const audioInitialized = await initAudio();
+        console.log("Audio initialization result:", audioInitialized);
+      } else {
+        console.log("Starting in silent mode");
+      }
+      
+      // Start the game
+      setShowModal(false);
+      setGameStarted(true);
+    } catch (error) {
+      console.error('Start game error:', error);
+      // Still start the game even if audio fails
+      setShowModal(false);
+      setGameStarted(true);
+    }
   };
 
+  // Add a useEffect to reinitialize audio when game starts
+  useEffect(() => {
+    if (gameStarted) {
+      console.log("Game started, initializing audio...");
+      initAudio();
+    }
+    // No cleanup function needed as we want to keep the synth alive
+  }, [gameStarted]);
+
+  // Add a useEffect to handle audio context resuming after user interaction
+  useEffect(() => {
+    const resumeAudioContext = async () => {
+      if (Tone.context.state !== "running") {
+        console.log("Resuming audio context after user interaction...");
+        await Tone.context.resume();
+        await Tone.start();
+        if (!synthRef.current || synthRef.current.disposed) {
+          await initAudio();
+        }
+      }
+    };
+
+    window.addEventListener('click', resumeAudioContext);
+    window.addEventListener('touchstart', resumeAudioContext);
+    window.addEventListener('keydown', resumeAudioContext);
+
+    return () => {
+      window.removeEventListener('click', resumeAudioContext);
+      window.removeEventListener('touchstart', resumeAudioContext);
+      window.removeEventListener('keydown', resumeAudioContext);
+    };
+  }, []);
+
   return (
-    <div className="relative w-full h-screen bg-[#222]">
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full"
-        style={{ touchAction: 'none' }}
-      />
-      
-      {showModal && (
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black/90 border-2 border-[#F7931A] p-8 text-white text-center min-w-[320px] max-w-[90%] z-50">
-          <div className="text-[#F7931A] text-5xl mb-1">₿</div>
-          <div className="text-[#F7931A] text-2xl mb-5">CRAZY PONG</div>
-          <p className="my-5 leading-relaxed">
-            This is the bitcoin crazy pong! The difficulty changes every 5 seconds based on the Bitcoin mempool size. When the mempool is full, Satoshi becomes more unpredictable! Use up/down arrows on desktop or slide on mobile to control your paddle.
-          </p>
-          <button
-            onClick={startGame}
-            className="bg-[#F7931A] text-black border-none px-5 py-2.5 mt-4 font-mono cursor-pointer hover:bg-[#d17c15]"
-          >
-            Got it!
-          </button>
+    <>
+      {isClient ? (
+        <div className="relative w-full h-screen bg-[#222]">
+          <canvas
+            ref={canvasRef}
+            className="w-full h-full"
+            style={{ touchAction: 'none' }}
+          />
+          <div id="flash" className="fixed top-0 left-0 w-full h-full bg-[#F7931A] opacity-0 pointer-events-none transition-opacity duration-50" />
+            
+          {/* Only show audio controls when game has started */}
+          {gameStarted && (
+            <>
+              {/* Riff Switch Button - Bottom Left */}
+              <div className="fixed bottom-8 left-8 opacity-0 animate-fade-in">
+                <button
+                  onClick={switchRiff}
+                  className="bg-[#F7931A] text-black p-3 rounded-full w-14 h-14 flex items-center justify-center hover:bg-[#d17c15] transition-colors shadow-lg text-xl"
+                  title={`Current: ${getRiffDisplay().title}`}
+                >
+                  {getRiffDisplay().icon}
+                </button>
+              </div>
+
+              {/* Mute Button - Bottom Right */}
+              <div className="fixed bottom-8 right-8 opacity-0 animate-fade-in">
+                <button
+                  onClick={toggleMute}
+                  className="bg-[#F7931A] text-black p-3 rounded-full w-14 h-14 flex items-center justify-center hover:bg-[#d17c15] transition-colors shadow-lg"
+                  title={isMuted ? "Unmute" : "Mute"}
+                >
+                  {isMuted ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
+          
+          {showModal && (
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black/90 border-2 border-[#F7931A] p-8 text-white text-center min-w-[320px] max-w-[90%] z-50">
+              <div className="text-[#F7931A] text-5xl mb-1">₿</div>
+              <div className="text-[#F7931A] text-2xl mb-5">CRAZY PONG</div>
+              <p className="my-5 leading-relaxed">
+                This is the bitcoin crazy pong! The difficulty changes every 5 seconds based on the Bitcoin mempool size. When the mempool is full, Satoshi becomes more unpredictable! Use up/down arrows on desktop or slide on mobile to control your paddle.
+              </p>
+              <button
+                onClick={startGame}
+                className="bg-[#F7931A] text-black border-none px-5 py-2.5 mt-4 font-mono cursor-pointer hover:bg-[#d17c15]"
+              >
+                Got it!
+              </button>
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      ) : null}
+    </>
   );
 }
+
+// Add animation keyframes to the global styles
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-fade-in {
+    animation: fade-in 0.5s ease-out forwards;
+  }
+`;
+document.head.appendChild(style);
 
