@@ -7,11 +7,6 @@
         "imageUrl": "https://bitcoincrazypong.xyz/opengraph-image",
         "buttonTitle": "🚩 Play Pong!",
         "splashImageUrl": "https://bitcoincrazypong.xyz/logo.png",
-        "splashBackgroundColor": "#000000",
-        "accountAssociation": {
-            "header": "eyJmaWQiOjMzODA1OSwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDYzNTVGQWQ4NTg1NzZhMTMwZjBlMWFiNTg4NmIxNDlhMDQ3MzFhNDIifQ",
-            "payload": "eyJkb21haW4iOiJiaXRjb2luY3Jhenlwb25nLnh5eiJ9",
-            "signature": "MHhlM2Q4NzkyMDY4MzIxODkwZmVkZjg0MmZlYTRmMzU5NDhhYjY3MThhNDEwYjhjNjliYjMxNGM5ZDBhYmI1N2I5MmM2NmZmMDliOTA2ZTI0ZmFiYjJlOWM2ZmQ1MjRiM2Q3NzY5YjczNDg1MDkzZWViMGNjYjY5ZDNmZjI2YjA4YzFi"
-        }
+        "splashBackgroundColor": "#000000"
     }
 }
