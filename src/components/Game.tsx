@@ -213,13 +213,13 @@ export default function Game() {
       
       // AI paddle movement
       let targetY = ball.y - rightPaddle.height / 2;
-      let errorRange = 80 - (normalizedDifficulty * 0.6);
-      let error = Math.random() * errorRange - (errorRange / 2);
+      const errorRange = 80 - (normalizedDifficulty * 0.6);
+      const error = Math.random() * errorRange - (errorRange / 2);
       if (Math.random() < (0.3 - (normalizedDifficulty * 0.002))) {
         targetY = rightPaddle.y;
       }
       targetY += error;
-      let moveSpeed = (targetY - rightPaddle.y) * (0.05 + (normalizedDifficulty * 0.0005));
+      const moveSpeed = (targetY - rightPaddle.y) * (0.05 + (normalizedDifficulty * 0.0005));
       rightPaddle.y += moveSpeed;
       
       // Player paddle movement

@@ -1,0 +1,12 @@
+{
+    "frame": {
+      "version": "1",
+      "name": "Bitcoin Crazy Pong",
+      "iconUrl": "https://bitcoincrazypong.xyz/logo.png",
+      "homeUrl": "https://bitcoincrazypong.xyz",
+      "imageUrl": "https://bitcoincrazypong.xyz/opengraph-image",
+      "buttonTitle": "🚩 Play Pong!",
+      "splashImageUrl": "https://bitcoincrazypong.xyz/logo.png",
+      "splashBackgroundColor": "#000000"
+    }
+  }
