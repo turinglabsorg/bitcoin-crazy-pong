@@ -3,17 +3,30 @@
 import { useEffect, useRef, useState } from "react";
 import * as Tone from "tone";
 
+// Add Web Audio API types
+declare global {
+  interface Window {
+    webkitAudioContext: typeof AudioContext;
+  }
+}
+
 export default function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gameStarted, setGameStarted] = useState(false);
   const [showModal, setShowModal] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [currentRiff, setCurrentRiff] = useState<'metallica' | 'tool' | 'stranger' | 'none'>('none');
+  const [isClient, setIsClient] = useState(false);
+  const [showAudioPrompt, setShowAudioPrompt] = useState(false);
+  const [audioError, setAudioError] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 0);
   
   // Synth references
   const synthRef = useRef<Tone.Synth | null>(null);
   const melodyRef = useRef<Tone.Sequence | null>(null);
-
+  const isMobile = useRef(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(typeof navigator !== 'undefined' ? navigator.userAgent : ''));
+  
   // Game state
   const gameState = useRef({
     bitcoinDifficulty: 0,
@@ -59,44 +72,67 @@ export default function Game() {
     }
   });
 
-  // Add state for audio ready
-  const [isAudioReady, setIsAudioReady] = useState(false);
-  const [isClient, setIsClient] = useState(false);
 
   // Check if we're on the client side
   useEffect(() => {
     setIsClient(true);
+    // Set viewport height for mobile Chrome/Safari toolbars
+    const setVh = () => setViewportHeight(window.innerHeight);
+    setVh();
+    window.addEventListener('resize', setVh);
+    window.addEventListener('orientationchange', setVh);
+    return () => {
+      window.removeEventListener('resize', setVh);
+      window.removeEventListener('orientationchange', setVh);
+    };
   }, []);
 
-  // Initialize Tone.js only on client side
+  // Check if we're on mobile
   useEffect(() => {
-    if (isClient) {
-      const setupAudio = async () => {
-        try {
-          if (Tone.context.state !== "running") {
-            await Tone.start();
-            await Tone.context.resume();
-          }
-          setIsAudioReady(true);
-        } catch (error) {
-          console.error("Failed to initialize audio:", error);
-        }
-      };
-      setupAudio();
+    isMobile.current = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  }, []);
+
+  // Initialize audio with user interaction (synchronous, robust for mobile)
+  const initializeAudio = () => {
+    try {
+      if (synthRef.current) {
+        synthRef.current.dispose();
+        synthRef.current = null;
+      }
+      synthRef.current = new Tone.Synth().toDestination();
+      synthRef.current.volume.value = -10;
+      synthRef.current.triggerAttackRelease("C4", "8n");
+      setAudioError(false);
+      setAudioEnabled(true);
+      return true;
+    } catch {
+      setAudioError(true);
+      setAudioEnabled(false);
+      return false;
     }
-  }, [isClient]);
+  };
+
+  // Start game function (never block)
+  const startGame = () => {
+    setShowModal(false);
+    setGameStarted(true);
+    // Try to enable audio, but don't block
+    if (!synthRef.current) {
+      initializeAudio();
+    }
+  };
+
+  // Handler to start game without sound
+  const startWithoutSound = () => {
+    setShowAudioPrompt(false);
+    setShowModal(false);
+    setGameStarted(true);
+    setAudioEnabled(false);
+  };
 
   // Initialize audio
   const initAudio = async () => {
     try {
-      // Only proceed if we're on client side and audio is ready
-      if (!isClient || !isAudioReady) {
-        console.log("Audio not ready or not on client side");
-        return false;
-      }
-
-      console.log("Starting audio initialization...");
-      
       // Create new synth if it doesn't exist or is disposed
       if (!synthRef.current || synthRef.current.disposed) {
         console.log("Creating new synth...");
@@ -112,7 +148,6 @@ export default function Game() {
         
         // Set initial volume
         synthRef.current.volume.value = isMuted ? -Infinity : -12;
-        console.log("Synth created with volume:", synthRef.current.volume.value);
       }
 
       // Stop any existing sequence
@@ -131,7 +166,6 @@ export default function Game() {
         let bpm: number;
 
         if (currentRiff === 'metallica') {
-          // Master of Puppets main riff (simplified)
           melody = [
             "E4", "E4", "G4", "C5", "B4", "E4",  // First phrase
             "D4", "C4", "B3", "E4",              // Second phrase
@@ -140,8 +174,7 @@ export default function Game() {
           ];
           noteLength = "16n";
           bpm = 180;
-        } else {
-          // Tool's Schism main riff (simplified)
+        } else if (currentRiff === 'tool') {
           melody = [
             "D3", "D3", "A3", "D3",              // First measure
             "G3", "A3", "D3", null,              // Second measure
@@ -153,7 +186,20 @@ export default function Game() {
             "G3", "A3", "B3", null               // Resolution
           ];
           noteLength = "8n";
-          bpm = 90; // Schism's tempo
+          bpm = 90;
+        } else {
+          melody = [
+            "C4", "E4", "G4", "B4",              // First arpeggio
+            "C5", "B4", "G4", "E4",              // Descending
+            "C4", "E4", "G4", "B4",              // Repeat
+            "C5", "B4", "G4", "E4",              // Descending
+            "C4", null, "E4", null,              // Sparse notes for tension
+            "G4", null, "B4", null,              // Building up
+            "C5", "B4", "G4", "E4",              // Final descent
+            "C4", null, null, null               // End on root
+          ];
+          noteLength = "8n";
+          bpm = 85;
         }
 
         // Adjust envelope based on the riff
@@ -163,12 +209,17 @@ export default function Game() {
             synthRef.current.envelope.decay = 0.2;
             synthRef.current.envelope.sustain = 0.3;
             synthRef.current.envelope.release = 0.1;
-          } else {
-            // More sustained sound for Tool
+          } else if (currentRiff === 'tool') {
             synthRef.current.envelope.attack = 0.02;
             synthRef.current.envelope.decay = 0.3;
             synthRef.current.envelope.sustain = 0.4;
             synthRef.current.envelope.release = 0.3;
+          } else {
+            synthRef.current.envelope.attack = 0.1;
+            synthRef.current.envelope.decay = 0.3;
+            synthRef.current.envelope.sustain = 0.7;
+            synthRef.current.envelope.release = 0.8;
+            synthRef.current.oscillator.type = "sawtooth";
           }
         }
 
@@ -182,12 +233,9 @@ export default function Game() {
           noteLength
         );
 
-        // Set tempo
+        // Set tempo and start
         Tone.Transport.bpm.value = bpm;
-
-        // Start transport and sequence if not muted
         if (!isMuted) {
-          console.log(`Starting ${currentRiff} riff...`);
           Tone.Transport.start();
           melodyRef.current.start(0);
         }
@@ -203,25 +251,20 @@ export default function Game() {
   // Toggle mute
   const toggleMute = async () => {
     try {
-      console.log("Toggling mute...");
       const newMutedState = !isMuted;
       setIsMuted(newMutedState);
 
       if (!synthRef.current || !melodyRef.current) {
-        console.log("No audio to toggle - reinitializing...");
         await initAudio();
         return;
       }
 
-      console.log("Setting synth volume:", newMutedState ? "muted" : "unmuted");
       synthRef.current.volume.value = newMutedState ? -Infinity : -12;
 
       if (newMutedState) {
-        console.log("Stopping melody");
         melodyRef.current.stop();
         Tone.Transport.stop();
       } else {
-        console.log("Starting melody");
         Tone.Transport.start();
         melodyRef.current.start(0);
       }
@@ -267,21 +310,13 @@ export default function Game() {
   // Play hit sound
   const playHitSound = async () => {
     try {
-      console.log("Playing hit sound...");
+      if (isMuted) return;
       
-      // If no synth, try to initialize audio
       if (!synthRef.current) {
-        console.log("No synth found, initializing audio...");
         await initAudio();
       }
-
-      // Double check we have a synth after potential initialization
-      if (!synthRef.current) {
-        console.log("Failed to initialize synth");
-        return;
-      }
-
-      if (!isMuted && synthRef.current && !synthRef.current.disposed) {
+      
+      if (synthRef.current && !synthRef.current.disposed) {
         synthRef.current.triggerAttackRelease("G5", "16n");
       }
     } catch (error) {
@@ -292,21 +327,13 @@ export default function Game() {
   // Play score sound
   const playScoreSound = async () => {
     try {
-      console.log("Playing score sound...");
+      if (isMuted) return;
       
-      // If no synth, try to initialize audio
       if (!synthRef.current) {
-        console.log("No synth found, initializing audio...");
         await initAudio();
       }
-
-      // Double check we have a synth after potential initialization
-      if (!synthRef.current) {
-        console.log("Failed to initialize synth");
-        return;
-      }
-
-      if (!isMuted && synthRef.current && !synthRef.current.disposed) {
+      
+      if (synthRef.current && !synthRef.current.disposed) {
         const now = Tone.now();
         synthRef.current.triggerAttackRelease("C5", "8n", now);
         synthRef.current.triggerAttackRelease("E5", "8n", now + 0.1);
@@ -480,7 +507,8 @@ export default function Game() {
     // Set canvas size
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      // Use viewportHeight if available, else fallback
+      canvas.height = viewportHeight || window.innerHeight;
       
       // Initialize game objects with new dimensions
       gameState.current.ball.radius = Math.min(canvas.width, canvas.height) * 0.02;
@@ -812,38 +840,7 @@ export default function Game() {
         Tone.Transport.stop();
       }
     };
-  }, [gameStarted, isMuted]);
-
-  // Start game function
-  const startGame = async () => {
-    try {
-      console.log("Starting game...");
-      
-      // Ensure audio context is ready
-      if (Tone.context.state !== "running") {
-        console.log("Requesting initial audio permission...");
-        await Tone.context.resume();
-        await Tone.start();
-      }
-      
-      // Only initialize audio if not in 'none' state
-      if (currentRiff !== 'none') {
-        const audioInitialized = await initAudio();
-        console.log("Audio initialization result:", audioInitialized);
-      } else {
-        console.log("Starting in silent mode");
-      }
-      
-      // Start the game
-      setShowModal(false);
-      setGameStarted(true);
-    } catch (error) {
-      console.error('Start game error:', error);
-      // Still start the game even if audio fails
-      setShowModal(false);
-      setGameStarted(true);
-    }
-  };
+  }, [gameStarted, isMuted, viewportHeight]);
 
   // Add a useEffect to reinitialize audio when game starts
   useEffect(() => {
@@ -854,43 +851,73 @@ export default function Game() {
     // No cleanup function needed as we want to keep the synth alive
   }, [gameStarted]);
 
-  // Add a useEffect to handle audio context resuming after user interaction
-  useEffect(() => {
-    const resumeAudioContext = async () => {
-      if (Tone.context.state !== "running") {
-        console.log("Resuming audio context after user interaction...");
-        await Tone.context.resume();
-        await Tone.start();
-        if (!synthRef.current || synthRef.current.disposed) {
-          await initAudio();
-        }
-      }
-    };
-
-    window.addEventListener('click', resumeAudioContext);
-    window.addEventListener('touchstart', resumeAudioContext);
-    window.addEventListener('keydown', resumeAudioContext);
-
-    return () => {
-      window.removeEventListener('click', resumeAudioContext);
-      window.removeEventListener('touchstart', resumeAudioContext);
-      window.removeEventListener('keydown', resumeAudioContext);
-    };
-  }, []);
-
   return (
     <>
       {isClient ? (
-        <div className="relative w-full h-screen bg-[#222]">
+        <div
+          className="relative w-full bg-[#222]"
+          style={{ height: viewportHeight ? `${viewportHeight}px` : '100vh' }}
+        >
           <canvas
             ref={canvasRef}
-            className="w-full h-full"
-            style={{ touchAction: 'none' }}
+            className="w-full"
+            style={{
+              height: viewportHeight ? `${viewportHeight}px` : '100vh',
+              touchAction: 'none',
+            }}
           />
           <div id="flash" className="fixed top-0 left-0 w-full h-full bg-[#F7931A] opacity-0 pointer-events-none transition-opacity duration-50" />
             
-          {/* Only show audio controls when game has started */}
-          {gameStarted && (
+          {/* Audio prompt for mobile */}
+          {showAudioPrompt && (
+            <div 
+              className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black/90 border-2 border-[#F7931A] p-8 text-white text-center rounded-lg z-50"
+            >
+              <div className="text-[#F7931A] text-4xl mb-4">🔊</div>
+              <p className="text-lg mb-2">Tap to Enable Sound</p>
+              <p className="text-sm opacity-75">Your device requires a tap to enable audio</p>
+              {audioError && <p className="text-red-400 mt-2">Audio failed. Try again or start without sound.</p>}
+              <div className="flex flex-col gap-2 mt-4">
+                <button
+                  className="bg-[#F7931A] text-black px-4 py-2 rounded font-mono hover:bg-[#d17c15]"
+                  onClick={() => {
+                    const success = initializeAudio();
+                    if (success) {
+                      setShowModal(false);
+                      setGameStarted(true);
+                    }
+                  }}
+                >
+                  Enable Sound
+                </button>
+                <button
+                  className="bg-gray-700 text-white px-4 py-2 rounded font-mono hover:bg-gray-600"
+                  onClick={startWithoutSound}
+                >
+                  Start Without Sound
+                </button>
+              </div>
+            </div>
+          )}
+            
+          {showModal && (
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black/90 border-2 border-[#F7931A] p-8 text-white text-center min-w-[320px] max-w-[90%] z-50">
+              <div className="text-[#F7931A] text-5xl mb-1">₿</div>
+              <div className="text-[#F7931A] text-2xl mb-5">CRAZY PONG</div>
+              <p className="my-5 leading-relaxed">
+                This is the bitcoin crazy pong! The difficulty changes every 5 seconds based on the Bitcoin mempool size. When the mempool is full, Satoshi becomes more unpredictable! Use up/down arrows on desktop or slide on mobile to control your paddle.
+              </p>
+              <button
+                onClick={startGame}
+                className="bg-[#F7931A] text-black border-none px-5 py-2.5 mt-4 font-mono cursor-pointer hover:bg-[#d17c15]"
+              >
+                Got it!
+              </button>
+            </div>
+          )}
+
+          {/* Only show audio controls when game has started and not on mobile */}
+          {gameStarted && !isMobile.current && (
             <>
               {/* Riff Switch Button - Bottom Left */}
               <div className="fixed bottom-8 left-8 opacity-0 animate-fade-in">
@@ -924,20 +951,20 @@ export default function Game() {
               </div>
             </>
           )}
-          
-          {showModal && (
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black/90 border-2 border-[#F7931A] p-8 text-white text-center min-w-[320px] max-w-[90%] z-50">
-              <div className="text-[#F7931A] text-5xl mb-1">₿</div>
-              <div className="text-[#F7931A] text-2xl mb-5">CRAZY PONG</div>
-              <p className="my-5 leading-relaxed">
-                This is the bitcoin crazy pong! The difficulty changes every 5 seconds based on the Bitcoin mempool size. When the mempool is full, Satoshi becomes more unpredictable! Use up/down arrows on desktop or slide on mobile to control your paddle.
-              </p>
+
+          {/* Show enable sound button if game is running but audio is not enabled and not on mobile */}
+          {gameStarted && !audioEnabled && !isMobile.current && (
+            <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center">
               <button
-                onClick={startGame}
-                className="bg-[#F7931A] text-black border-none px-5 py-2.5 mt-4 font-mono cursor-pointer hover:bg-[#d17c15]"
+                className="bg-[#F7931A] text-black px-4 py-2 rounded font-mono shadow-lg hover:bg-[#d17c15]"
+                onClick={() => {
+                  const success = initializeAudio();
+                  if (success) setAudioEnabled(true);
+                }}
               >
-                Got it!
+                Enable Sound
               </button>
+              {audioError && <div className="text-red-400 text-xs mt-2">Audio failed. Try again.</div>}
             </div>
           )}
         </div>
