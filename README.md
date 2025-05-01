@@ -12,6 +12,17 @@ A Bitcoin-themed Pong game where the difficulty dynamically adjusts based on the
 - **Momentum Physics**: Paddle movement has realistic momentum and smooth controls
 - **Bitcoin Orange Ball**: The ball changes size based on its speed
 - **Live Score Display**: Track your score against Satoshi
+- **Epic Soundtrack**: Choose from three iconic riffs:
+  - 🤘 Master of Puppets (Metallica)
+  - 🌀 Schism (Tool)
+  - 🔮 Stranger Things theme
+- **Sound Effects**: Immersive audio feedback for paddle hits and scoring
+- **Audio Controls**: Easy access to mute and riff selection
+- **Enhanced UI**: 
+  - Centered mempool transaction display
+  - Fade-in audio controls
+  - Improved button placement and sizing
+  - Better touch targets for mobile play
 
 ## 🎯 How to Play
 
@@ -21,6 +32,10 @@ A Bitcoin-themed Pong game where the difficulty dynamically adjusts based on the
 2. Try to hit the Bitcoin orange ball past Satoshi's paddle
 3. Watch the difficulty change every 5 seconds based on the Bitcoin mempool
 4. Score points by getting the ball past Satoshi's paddle
+5. Customize your experience:
+   - Tap the 🤘 button to cycle through different riffs
+   - Use the 🔊 button to toggle sound effects
+   - Watch the mempool transaction count in real-time
 
 ## 🔄 Difficulty System
 
@@ -47,6 +62,8 @@ Play the game here: [Bitcoin Crazy Pong](https://turinglabsorg.github.io/bitcoin
 - Bitcoin symbol watermark in the background
 - Clean, minimalist interface
 - Score display with player names
+- Semi-transparent mempool display
+- Modern audio control buttons with tooltips
 
 ## 🤝 Contributing
 
@@ -83,6 +100,9 @@ You're playing against Satoshi's AI, and just like Bitcoin mining, it adjusts wi
 - Responsive design for both desktop and mobile
 - Retro monospace aesthetic with Bitcoin orange accents
 - Live difficulty change indicator (↑↓)
+- Immersive audio experience with multiple riff options
+- Sound effects for paddle hits and scoring
+- Intuitive audio controls with fade-in animation
 
 ## 🏆 Can You Beat Satoshi?
 
@@ -104,6 +124,9 @@ Head over to [https://turinglabsorg.github.io/bitcoin-crazy-pong](https://turing
 - This is the only acceptable form of leverage in Bitcoin 📈
 - Running this game on your M2 MacBook still won't help you mine Bitcoin 💻
 - The only thing harder than beating Satoshi is convincing a maximalist to try an altcoin 🎮
+- Even Satoshi can't resist headbanging to Master of Puppets while playing 🤘
+- The mempool display is more transparent than most altcoin whitepapers 📄
+- Our sound effects are more real than most "Bitcoin killers" 🔊
 
 ---
 *Disclaimer: No actual bitcoins were harmed in the making of this game. Difficulty changes are real though! And yes, we know, "number go up" eventually.*
