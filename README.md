@@ -1,10 +1,60 @@
-# 🏓 Bitcoin Crazy Pong
+# Bitcoin Crazy Pong 🏓
 
-Welcome to the most volatile Pong game in the universe! Where the difficulty changes with Bitcoin's mining adjustments. 
+A Bitcoin-themed Pong game where the difficulty dynamically adjusts based on the Bitcoin mempool size. Play against Satoshi Nakamoto himself!
 
-**🎮 [Play Now!](https://turinglabsorg.github.io/bitcoin-crazy-pong)**
+## 🎮 Game Features
 
-![Bitcoin Crazy Pong Screenshot](screen.png)
+- **Dynamic Difficulty**: Game difficulty updates every 5 seconds based on real-time Bitcoin mempool data
+- **Bitcoin Integration**: Uses mempool.space API to fetch live network data
+- **Smooth Controls**: 
+  - Desktop: Use up/down arrow keys
+  - Mobile: Swipe to move your paddle
+- **Momentum Physics**: Paddle movement has realistic momentum and smooth controls
+- **Bitcoin Orange Ball**: The ball changes size based on its speed
+- **Live Score Display**: Track your score against Satoshi
+
+## 🎯 How to Play
+
+1. Control your paddle (left side) using:
+   - Desktop: Arrow keys (↑/↓)
+   - Mobile: Swipe up/down
+2. Try to hit the Bitcoin orange ball past Satoshi's paddle
+3. Watch the difficulty change every 5 seconds based on the Bitcoin mempool
+4. Score points by getting the ball past Satoshi's paddle
+
+## 🔄 Difficulty System
+
+The game's difficulty is determined by the Bitcoin mempool size:
+- More transactions in the mempool = Higher difficulty
+- Difficulty updates every 5 seconds
+- Affects Satoshi's paddle movement and prediction accuracy
+- Mempool size range: 1,000 to 50,000 transactions
+
+## 🚀 Live Demo
+
+Play the game here: [Bitcoin Crazy Pong](https://turinglabsorg.github.io/bitcoin-crazy-pong)
+
+## 💡 Technical Details
+
+- Built with vanilla JavaScript and HTML5 Canvas
+- Real-time mempool data from mempool.space API
+- Responsive design for both desktop and mobile
+- Smooth animations and physics-based movement
+
+## 🎨 Visual Elements
+
+- Bitcoin orange-colored ball that shrinks with speed
+- Bitcoin symbol watermark in the background
+- Clean, minimalist interface
+- Score display with player names
+
+## 🤝 Contributing
+
+Feel free to fork and contribute to this project! Pull requests are welcome.
+
+## 📝 License
+
+This project is open source and available under the MIT License.
 
 ## 🎮 What's This Madness?
 
