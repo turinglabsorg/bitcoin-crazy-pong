@@ -916,8 +916,8 @@ export default function Game() {
             </div>
           )}
 
-          {/* Only show audio controls when game has started and not on mobile */}
-          {gameStarted && !isMobile.current && (
+          {/* Only show audio controls when game has started */}
+          {gameStarted && (
             <>
               {/* Riff Switch Button - Bottom Left */}
               <div className="fixed bottom-8 left-8 opacity-0 animate-fade-in">
@@ -952,8 +952,8 @@ export default function Game() {
             </>
           )}
 
-          {/* Show enable sound button if game is running but audio is not enabled and not on mobile */}
-          {gameStarted && !audioEnabled && !isMobile.current && (
+          {/* Show enable sound button if game is running but audio is not enabled */}
+          {gameStarted && !audioEnabled && (
             <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center">
               <button
                 className="bg-[#F7931A] text-black px-4 py-2 rounded font-mono shadow-lg hover:bg-[#d17c15]"
