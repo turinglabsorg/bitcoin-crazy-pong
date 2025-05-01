@@ -1,24 +1,23 @@
 import type { Metadata } from "next";
-
-import { getSession } from "~/auth"
-import "~/app/globals.css";
-import { Providers } from "~/app/providers";
+import { getSession } from "~/auth";
+import "./globals.css";
+import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: process.env.NEXT_PUBLIC_FRAME_NAME || "Frames v2 Demo",
-  description: process.env.NEXT_PUBLIC_FRAME_DESCRIPTION || "A Farcaster Frames v2 demo app",
+  title: "Bitcoin Crazy Pong",
+  description: "Play Pong against Satoshi Nakamoto!",
 };
 
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
-}>) {  
-  const session = await getSession()
+}>) {
+  const session = await getSession();
 
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" className="dark">
+      <body className="min-h-screen font-['Space_Mono'] bg-black text-white">
         <Providers session={session}>{children}</Providers>
       </body>
     </html>

@@ -10,7 +10,7 @@ const iconUrl = `${appUrl}/icon.png`;
 
 const framePreviewMetadata = {
   version: "next",
-  imageUrl: `${appUrl}/opengraph-image`,
+  imageUrl: `${appUrl}/opengraph-image.png`,
   button: {
     title: process.env.NEXT_PUBLIC_FRAME_BUTTON_TEXT,
     action: {

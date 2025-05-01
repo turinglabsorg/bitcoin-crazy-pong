@@ -59,11 +59,11 @@ async function loadEnvLocal() {
       if (loadLocal) {
         console.log('Loading values from .env.local...');
         const localEnv = dotenv.parse(fs.readFileSync('.env.local'));
-        
+
         // Copy all values except SEED_PHRASE to .env
         const envContent = fs.existsSync('.env') ? fs.readFileSync('.env', 'utf8') + '\n' : '';
         let newEnvContent = envContent;
-        
+
         for (const [key, value] of Object.entries(localEnv)) {
           if (key !== 'SEED_PHRASE') {
             // Update process.env
@@ -74,7 +74,7 @@ async function loadEnvLocal() {
             }
           }
         }
-        
+
         // Write updated content to .env
         fs.writeFileSync('.env', newEnvContent);
         console.log('✅ Values from .env.local have been written to .env');
@@ -102,7 +102,7 @@ const projectRoot = path.join(__dirname, '..');
 async function validateDomain(domain) {
   // Remove http:// or https:// if present
   const cleanDomain = domain.replace(/^https?:\/\//, '');
-  
+
   // Basic domain validation
   if (!cleanDomain.match(/^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9](?:\.[a-zA-Z]{2,})+$/)) {
     throw new Error('Invalid domain format');
@@ -156,7 +156,7 @@ async function generateFarcasterMetadata(domain, fid, accountAddress, seedPhrase
   const encodedPayload = Buffer.from(JSON.stringify(payload), 'utf-8').toString('base64url');
 
   const account = mnemonicToAccount(seedPhrase);
-  const signature = await account.signMessage({ 
+  const signature = await account.signMessage({
     message: `${encodedHeader}.${encodedPayload}`
   });
   const encodedSignature = Buffer.from(signature, 'utf-8').toString('base64url');
@@ -172,7 +172,7 @@ async function generateFarcasterMetadata(domain, fid, accountAddress, seedPhrase
       name: process.env.NEXT_PUBLIC_FRAME_NAME,
       iconUrl: `https://${domain}/icon.png`,
       homeUrl: `https://${domain}`,
-      imageUrl: `https://${domain}/opengraph-image`,
+      imageUrl: `https://${domain}/opengraph-image.png`,
       buttonTitle: process.env.NEXT_PUBLIC_FRAME_BUTTON_TEXT,
       splashImageUrl: `https://${domain}/splash.png`,
       splashBackgroundColor: "#f7f7f7",
@@ -185,7 +185,7 @@ async function main() {
   try {
     console.log('\n📝 Checking environment variables...');
     console.log('Loading values from .env...');
-    
+
     // Load .env.local if user wants to
     await loadEnvLocal();
 
@@ -300,8 +300,8 @@ async function main() {
           type: 'password',
           name: 'seedPhrase',
           message: 'Your farcaster custody account seed phrase is required to create a signature proving this app was created by you.\n' +
-          `⚠️ ${yellow}${italic}seed phrase is only used to sign the frame manifest, then discarded${reset} ⚠️\n` +
-          'Seed phrase:',
+            `⚠️ ${yellow}${italic}seed phrase is only used to sign the frame manifest, then discarded${reset} ⚠️\n` +
+            'Seed phrase:',
           validate: async (input) => {
             try {
               await validateSeedPhrase(input);
@@ -325,9 +325,9 @@ async function main() {
 
     // Generate and sign manifest
     console.log('\n🔨 Generating frame manifest...');
-    
+
     // Determine webhook URL based on environment variables
-    const webhookUrl = neynarApiKey && neynarClientId 
+    const webhookUrl = neynarApiKey && neynarClientId
       ? `https://api.neynar.com/f/app/${neynarClientId}/event`
       : `${domain}/api/webhook`;
 
@@ -349,9 +349,9 @@ async function main() {
       `NEXT_PUBLIC_FRAME_BUTTON_TEXT="${buttonText}"`,
 
       // Neynar configuration (if it exists in current env)
-      ...(process.env.NEYNAR_API_KEY ? 
+      ...(process.env.NEYNAR_API_KEY ?
         [`NEYNAR_API_KEY="${process.env.NEYNAR_API_KEY}"`] : []),
-      ...(neynarClientId ? 
+      ...(neynarClientId ?
         [`NEYNAR_CLIENT_ID="${neynarClientId}"`] : []),
 
       // FID (if it exists in current env)
